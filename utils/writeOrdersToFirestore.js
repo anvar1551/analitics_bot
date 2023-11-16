@@ -2,6 +2,8 @@ const axios = require("axios");
 const admin = require("firebase-admin");
 const { readToken } = require("./readTokenFromFirestore");
 
+
+
 // Initialize Firebase Admin with your service account credentials
 
 const getOrdersAndHistory = async (
@@ -84,7 +86,7 @@ const getOrdersAndHistory = async (
           for (const [index, response] of historyResponses.entries()) {
             const document = data[index];
             const documentId = document.order_number;
-            const historyData = response.data;
+            const historyData = response.data.data.list;
 
             await historyRef.child(documentId).set(historyData);
             console.log("Writing history for", documentId);

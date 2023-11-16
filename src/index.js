@@ -2,6 +2,10 @@ const express = require("express");
 const axios = require("axios");
 const admin = require("firebase-admin");
 const serviceAccount = require("../credentials/firebase.json");
+const cron = require("node-cron");
+
+const ngrok = require("@ngrok/ngrok");
+const port = 3030;
 
 const { getToken } = require("../utils/getToken");
 const { readToken } = require("../utils/readTokenFromFirestore");
@@ -34,7 +38,10 @@ const specificDate = new Date(
   millisecond
 );
 
-console.log(specificDate);
+// Schedule the task to run every hour (0 * * * *)
+cron.schedule("0 * * * *", () => {
+  console.log("hello");
+});
 
 // app.use(function (req, res, next) {
 //     res.setHeader(
@@ -49,8 +56,10 @@ console.log(specificDate);
 
 app.post("/webhook", async (req, res) => {
   try {
-    const { orderId } = req.body;
+    const { order_number } = req.body;
     const lastUpdate = req.body;
+    // console.log(req.body);
+    // await getToken(admin)
 
     const { token } = await readToken(admin);
 
@@ -61,8 +70,14 @@ app.post("/webhook", async (req, res) => {
     const ordersRef = database.ref("orders");
     const historyRef = database.ref("history_orders");
 
-    const orderExistsPromise = ordersRef.child(orderId).once("value");
-    const historyExistsPromise = historyRef.child(orderId).once("value");
+    const orderExistsPromise = ordersRef.child(order_number).once("value");
+    const historyExistsPromise = historyRef.child(order_number).once("value");
+
+    const val = historyRef.child(16023784945550).once("value");
+    const sort = (await val).val();
+    console.log(sort)
+    const innerObjectsArray = Object.values(sort);
+    innerObjectsArray.map(val => console.log(val.date))
 
     const [orderSnapshot, historySnapshot] = await Promise.all([
       orderExistsPromise,
@@ -72,9 +87,10 @@ app.post("/webhook", async (req, res) => {
     const orderExists = orderSnapshot.exists();
     console.log(orderExists);
     const historyExists = historySnapshot.exists();
+    console.log(historyExists);
 
     if (!orderExists) {
-      const orderUrl = `https://prodapi.shipox.com/api/v2/admin/orders?search=${orderId}`;
+      const orderUrl = `https://prodapi.shipox.com/api/v2/admin/orders?search=${order_number}`;
 
       // Fetch order data from the external API
       const response = await fetch(orderUrl, { headers });
@@ -89,9 +105,9 @@ app.post("/webhook", async (req, res) => {
           token: newToken,
         };
 
-        // Save the updated access token securely to the Realtime Database
-        const accessTokenRef = database.ref("access-token/shipbox-token");
-        await accessTokenRef.set(token);
+        // // Save the updated access token securely to the Realtime Database
+        // const accessTokenRef = database.ref("access-token/shipbox-token");
+        // await accessTokenRef.set(token);
 
         // Make the request with the new token
         const newResponse = await axios.get(orderUrl, {
@@ -100,30 +116,38 @@ app.post("/webhook", async (req, res) => {
           },
         });
 
-        const data = newResponse.data.data.total;
-        console.log(data);
+        const data = newResponse.data.data.list;
+        ordersRef.child(order_number).set(data);
       } else {
         // Data was successfully retrieved
-        const data = response.data.data.total;
-        console.log(data);
+        const data = await response.json();
+        const { list } = data.data;
+        ordersRef.child(order_number).set(list);
+        console.log("Order has written!");
       }
     }
 
     if (!historyExists) {
-      const historyUrl = `https://prodapi.shipox.com/api/v1/public/order/${orderId}/history_items`;
+      const historyUrl = `https://prodapi.shipox.com/api/v1/public/order/${order_number}/history_items`;
       // Fetch history data from the external API
       const response = await axios.get(historyUrl, { headers });
       const historyData = response.data.data.list;
-      console.log(historyData);
+      // console.log(historyData);
       // Save the history data to the "history_orders" collection
-      //   historyRef.child(orderId).set(historyData);
+      historyRef.child(order_number).set(historyData);
+      console.log("History has written to database");
     }
 
     if (orderExists && historyExists) {
-      lastUpdate.date = new Date(lastUpdate.date * 1000).toISOString();
-      // Update the history data in the "history_orders" collection
-      const historyList = database.ref(`history_orders/${orderId}/data/list`);
-      const newHistoryItemRef = historyList.push();
+      // Create a reference to the "history_orders" collection
+      const historyCollection = database.ref(
+        `history_orders/${order_number}`
+      );
+      // const newKey = Date.now().toString(); 
+
+      // Generate a unique key for the new data
+      const newHistoryItemRef = historyCollection.push();
+      // console.log(newKey)
 
       newHistoryItemRef.set(lastUpdate, (error) => {
         if (error) {
@@ -147,3 +171,11 @@ app.post("/webhook", async (req, res) => {
 app.listen(3030, () => {
   console.log("Server runs in port 3030");
 });
+
+(async function () {
+  const listener = await ngrok.connect({
+    addr: port,
+    authtoken_from_env: true,
+  });
+  console.log(`Ingress established at: ${listener.url()}`);
+})();

@@ -22,7 +22,7 @@ const currentDate = new Date();
 
 // Get the date and time for 24 hours ago
 const twentyFourHoursAgo = new Date(currentDate);
-twentyFourHoursAgo.setHours(currentDate.getHours() - 2);
+twentyFourHoursAgo.setHours(currentDate.getHours() - 24);
 
 // Format the dates
 const statusToDateTime = formatDate(currentDate);

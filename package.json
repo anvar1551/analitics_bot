@@ -2,7 +2,7 @@
   "name": "control_bot",
   "version": "1.0.0",
   "description": "",
-  "main": "bot.js",
+  "main": "src/index.js",
   "scripts": {
     "start": "node index.js"
   },
@@ -10,12 +10,15 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@ngrok/ngrok": "^0.9.0",
     "axios": "^1.5.1",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "firebase-admin": "^11.11.0",
     "firebase-functions": "^4.4.1",
+    "ngrok": "^5.0.0-beta.2",
+    "node-cron": "^3.0.3",
     "node-telegram-bot-api": "^0.63.0",
-    "nodemon": "^3.0.1"
+    "telegraf": "^4.15.0"
   }
 }
